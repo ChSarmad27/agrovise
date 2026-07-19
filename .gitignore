@@ -1,0 +1,9 @@
+# Local backup of files removed in the 2026-07 cleanup (kept locally only)
+_removed_backup_2026-07-04.zip
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Windows junk
+Thumbs.db
+desktop.ini

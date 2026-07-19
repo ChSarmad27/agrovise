@@ -1,0 +1,16 @@
+# AGROVISE - uploads are DATA ONLY. Never execute anything here.
+# Even if an attacker sneaks a .php past the image checks, it cannot run.
+
+php_flag engine off
+
+<FilesMatch "\.(php|php3|php4|php5|php7|php8|phtml|phar|pl|py|cgi|asp|aspx|jsp|sh|exe|htaccess)$">
+    Require all denied
+</FilesMatch>
+
+# Only let images be served from here
+<FilesMatch "\.(jpg|jpeg|png|gif|webp)$">
+    Require all granted
+</FilesMatch>
+
+Options -Indexes -ExecCGI
+AddType text/plain .php .phtml .phar

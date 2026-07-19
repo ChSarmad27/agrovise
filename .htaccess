@@ -1,0 +1,23 @@
+# AGROVISE - root security rules (Apache)
+
+# No directory listings anywhere
+Options -Indexes
+
+# Block direct download of sensitive files (DB dumps, docs, backups, VCS, config)
+<FilesMatch "\.(sql|md|zip|log|sh|py|ini|bak|old|dist|json|lock)$">
+    Require all denied
+</FilesMatch>
+
+# Hide dotfiles (.htaccess, .git, etc.)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Do not leak the PHP version
+<IfModule mod_headers.c>
+    Header unset X-Powered-By
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+ServerSignature Off
