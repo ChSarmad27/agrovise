@@ -134,7 +134,7 @@ foreach ($topProducts as $p) $maxProdViews = max($maxProdViews, intval($p['views
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/style.css?v=ed3">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="../assets/js/chart.umd.min.js"></script>
     <style>
         .tf-kpis {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

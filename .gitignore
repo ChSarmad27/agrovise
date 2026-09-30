@@ -1,8 +1,16 @@
-# Local backup of files removed in the 2026-07 cleanup (kept locally only)
-_removed_backup_2026-07-04.zip
+# Full database dump with business data - keep local, never commit.
+# Fresh installs use database/schema.sql instead.
+/agrovise_db.sql
 
-# Claude Code local settings
-.claude/settings.local.json
+# Server database credentials (copy includes/config.example.php)
+/includes/config.php
+
+# Uploaded files (product photos, expense bills) live only on the server
+/uploads/*
+!/uploads/.htaccess
+
+# Backups
+*.zip
 
 # Windows junk
 Thumbs.db

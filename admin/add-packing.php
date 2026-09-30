@@ -13,8 +13,8 @@ $errors = [];
 
 // Fetch initial data for JS
 $bulkItemsStmt = $conn->query("
-    SELECT p.id, pr.name, p.batch_number, p.quantity, p.purchase_price, p.date_added 
-    FROM purchasing p JOIN products pr ON p.product_id = pr.id 
+    SELECT p.id, pr.name, p.batch_number, p.quantity, p.purchase_price, p.date_added, p.expiry_date
+    FROM purchasing p JOIN products pr ON p.product_id = pr.id
     WHERE p.type = 'BULK' AND p.quantity > 0
 ");
 $bulkItems = $bulkItemsStmt->fetchAll();
@@ -29,26 +29,54 @@ $packingItems = $packingItemsStmt->fetchAll();
 $allProductsStmt = $conn->query("SELECT id, name, category, packing_type FROM products ORDER BY name ASC");
 $allProducts = $allProductsStmt->fetchAll();
 
+// Pack size catalog (managed on pack-sizes.php): quantity per bottle/bag + packs per carton
+$packSizes = $conn->query("SELECT * FROM pack_sizes ORDER BY container, size_unit, size_value")->fetchAll();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Collect Data
     $bulk_id = intval($_POST['bulk_purchase_id'] ?? 0);
     $bulk_qty_used = floatval($_POST['bulk_quantity_used'] ?? 0);
     $bulk_unit_price = floatval($_POST['bulk_unit_price'] ?? 0);
     $bulk_cost = $bulk_qty_used * $bulk_unit_price;
-    
+
     $finished_product_id = intval($_POST['finished_product_id'] ?? 0);
     $finished_batch = trim($_POST['finished_batch'] ?? '');
     $finished_qty = floatval($_POST['finished_qty'] ?? 0);
+    $finished_expiry = trim($_POST['finished_expiry'] ?? '');
+    $finished_expiry = $finished_expiry !== '' ? $finished_expiry : null;
     $selling_price = floatval($_POST['selling_price'] ?? 0); // User manual input for info
-    
+    $pack_size_id = intval($_POST['pack_size_id'] ?? 0);
+
+    if ($finished_expiry !== null && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $finished_expiry)) {
+        $errors[] = "Invalid expiry date.";
+    }
+
     $materials = $_POST['materials'] ?? [];
-    
+
     // Validation
     if (!$bulk_id) $errors[] = "Bulk product must be selected.";
     if ($bulk_qty_used <= 0) $errors[] = "Bulk quantity used must be greater than zero.";
     if (!$finished_product_id) $errors[] = "Finished product type must be selected.";
     if (empty($finished_batch)) $errors[] = "Finished batch number is required.";
     if ($finished_qty <= 0) $errors[] = "Quantity produced must be > 0.";
+
+    // Optional pack size: snapshot its label and derive cartons from packs produced
+    $packRow = null; $pack_label = null; $cartons = null;
+    if ($pack_size_id > 0) {
+        $psSt = $conn->prepare("SELECT * FROM pack_sizes WHERE id = ?");
+        $psSt->execute([$pack_size_id]);
+        $packRow = $psSt->fetch();
+        if (!$packRow) {
+            $errors[] = "The selected pack size no longer exists.";
+        } else {
+            $sizeTxt = rtrim(rtrim(number_format($packRow['size_value'], 2), '0'), '.');
+            $pack_label = $sizeTxt . ' ' . $packRow['size_unit'] . ' ' . $packRow['container']
+                        . ' x ' . intval($packRow['packs_per_carton']) . '/carton';
+            if ($finished_qty > 0) {
+                $cartons = round($finished_qty / intval($packRow['packs_per_carton']), 2);
+            }
+        }
+    }
     
     // Verify bulk stock
     if ($bulk_id > 0) {
@@ -113,15 +141,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $unit_cost_produced = $total_cost / $finished_qty;
             
             // 3. Create FINISHED product in purchasing
-            $insFin = $conn->prepare("INSERT INTO purchasing (product_id, batch_number, type, purchase_price, quantity, total_price) VALUES (?, ?, 'FINISHED', ?, ?, ?)");
-            $insFin->execute([$finished_product_id, $finished_batch, $unit_cost_produced, $finished_qty, $total_cost]);
+            $insFin = $conn->prepare("INSERT INTO purchasing (product_id, batch_number, type, purchase_price, quantity, total_price, expiry_date) VALUES (?, ?, 'FINISHED', ?, ?, ?, ?)");
+            $insFin->execute([$finished_product_id, $finished_batch, $unit_cost_produced, $finished_qty, $total_cost, $finished_expiry]);
             $finished_purchase_id = $conn->lastInsertId();
             
             // 4. Create packing_operations record
             $packing_cost = $total_cost - $bulk_cost; // The difference is exactly the material cost in this basic logic
             
-            $insOp = $conn->prepare("INSERT INTO packing_operations (bulk_purchase_id, quantity_used, bulk_cost, finished_purchase_id, total_material_cost, packing_cost, selling_price) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $insOp->execute([$bulk_id, $bulk_qty_used, $bulk_cost, $finished_purchase_id, $total_material_cost, $packing_cost, $selling_price]);
+            $insOp = $conn->prepare("INSERT INTO packing_operations (bulk_purchase_id, quantity_used, bulk_cost, finished_purchase_id, total_material_cost, packing_cost, selling_price, pack_size_id, pack_label, cartons) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $insOp->execute([$bulk_id, $bulk_qty_used, $bulk_cost, $finished_purchase_id, $total_material_cost, $packing_cost, $selling_price, $packRow ? $pack_size_id : null, $pack_label, $cartons]);
             $operation_id = $conn->lastInsertId();
             
             // 5. Insert materials used
@@ -192,8 +220,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <input type="hidden" id="max_bulk_qty">
                             
                             <div style="margin-top: 15px;">
-                                <label class="form-label">Quantity to Use *</label>
-                                <input type="number" name="bulk_quantity_used" id="bulk_quantity_used" class="form-input" step="0.01" style="max-width: 200px;" oninput="calcTotals()">
+                                <label class="form-label">Quantity to Use * <span style="font-weight:400; color:#666;">(litres for bottled products, kg for bagged)</span></label>
+                                <input type="number" name="bulk_quantity_used" id="bulk_quantity_used" class="form-input" step="0.01" style="max-width: 200px;" oninput="calcTotals(); recalcPack();">
                             </div>
                         </div>
                     </div>
@@ -206,20 +234,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div style="padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                         <div class="form-group">
                             <label class="form-label">Finished Product Type *</label>
-                            <select name="finished_product_id" class="form-select" required>
+                            <select name="finished_product_id" id="finished_product_id" class="form-select" required onchange="filterPackSizes()">
                                 <option value="">-- Select --</option>
                                 <?php foreach ($allProducts as $p): ?>
-                                <option value="<?php echo $p['id']; ?>"><?php echo sanitize($p['name']) . ' (' . sanitize($p['packing_type']) . ')'; ?></option>
+                                <option value="<?php echo $p['id']; ?>" data-packing="<?php echo sanitize($p['packing_type'] ?? 'None'); ?>"><?php echo sanitize($p['name']) . ' (' . sanitize($p['packing_type']) . ')'; ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">New Batch Number * (Auto/Editable)</label>
-                            <input type="text" name="finished_batch" id="finished_batch" class="form-input" required value="<?php echo 'PK-'.date('Ymd').'-'.rand(10,99); ?>">
+                            <label class="form-label">Batch Number * (auto-fills from the bulk batch)</label>
+                            <input type="text" name="finished_batch" id="finished_batch" class="form-input" required placeholder="Select the bulk material first" value="">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Quantity Produced *</label>
+                            <label class="form-label">Expiry Date (auto-fills from the bulk lot — editable)</label>
+                            <input type="date" name="finished_expiry" id="finished_expiry" class="form-input" value="">
+                            <small style="color:#888;">Shown on Finished Stock and on invoices selling this lot.</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Pack Size (bottle / bag — optional)</label>
+                            <select name="pack_size_id" id="pack_size_id" class="form-select" onchange="recalcPack()">
+                                <option value="">-- Manual quantity (no pack size) --</option>
+                                <?php foreach ($packSizes as $ps):
+                                    $sizeTxt = rtrim(rtrim(number_format($ps['size_value'], 2), '0'), '.');
+                                ?>
+                                <option value="<?php echo $ps['id']; ?>"
+                                        data-container="<?php echo $ps['container']; ?>"
+                                        data-size="<?php echo $ps['size_value']; ?>"
+                                        data-unit="<?php echo $ps['size_unit']; ?>"
+                                        data-ppc="<?php echo intval($ps['packs_per_carton']); ?>">
+                                    <?php echo $sizeTxt . ' ' . $ps['size_unit'] . ' ' . $ps['container'] . ' — ' . intval($ps['packs_per_carton']) . ' per carton'; ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small style="color:#888;">Options come from the <a href="pack-sizes.php">Pack Sizes</a> page and follow the product's packing type. Bulk quantity is read as <strong>litres</strong> for bottles and <strong>kg</strong> for bags.</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Quantity Produced * <span id="qtyUnitHint">(packs)</span></label>
                             <input type="number" name="finished_qty" id="finished_qty" class="form-input" step="0.01" required oninput="calcTotals()">
+                            <small id="packSummary" style="color: var(--primary-green); font-weight: 600; display:none;"></small>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Planned Selling Price (Manual) Rs</label>
@@ -297,13 +349,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     document.getElementById('b_batch').innerText = sel.batch_number;
                     document.getElementById('b_stock').innerText = sel.quantity;
                     document.getElementById('b_price_disp').innerText = sel.purchase_price;
-                    
+
                     document.getElementById('bulk_purchase_id').value = sel.id;
                     document.getElementById('bulk_unit_price').value = sel.purchase_price;
                     document.getElementById('max_bulk_qty').value = sel.quantity;
-                    
+
+                    // Finished batch carries the SAME batch number as the bulk lot being packed,
+                    // and the expiry follows the bulk lot's expiry (both stay editable)
+                    document.getElementById('finished_batch').value = sel.batch_number;
+                    document.getElementById('finished_expiry').value = sel.expiry_date || '';
+
                     document.getElementById('bulk-details').style.display = 'block';
                     calcTotals();
+                    recalcPack();
                 }
             });
         }
@@ -366,6 +424,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             document.getElementById('calc_mat').innerText = matTotal.toFixed(2);
             document.getElementById('calc_grand').innerText = grandTotal.toFixed(2);
             document.getElementById('calc_unit').innerText = unitCost.toFixed(2);
+        }
+
+        // Only pack sizes matching the finished product's packing type are selectable
+        function filterPackSizes() {
+            const prodSel = document.getElementById('finished_product_id');
+            const packing = prodSel.selectedIndex >= 0
+                ? (prodSel.options[prodSel.selectedIndex].dataset.packing || 'None') : 'None';
+            const sel = document.getElementById('pack_size_id');
+            Array.from(sel.options).forEach(o => {
+                if (!o.value) return;
+                const show = packing === 'None' || o.dataset.container === packing;
+                o.hidden = !show;
+                o.disabled = !show;
+                if (!show && o.selected) sel.value = '';
+            });
+            recalcPack();
+        }
+
+        // Bulk quantity (L or kg) ÷ pack size => packs produced; ÷ packs-per-carton => cartons
+        function recalcPack() {
+            const sel = document.getElementById('pack_size_id');
+            const summary = document.getElementById('packSummary');
+            const unitHint = document.getElementById('qtyUnitHint');
+            if (!sel || !sel.value) {
+                if (summary) summary.style.display = 'none';
+                if (unitHint) unitHint.innerText = '(packs)';
+                return;
+            }
+            const opt = sel.options[sel.selectedIndex];
+            const size = parseFloat(opt.dataset.size) || 0;
+            const unit = opt.dataset.unit;
+            const ppc = parseInt(opt.dataset.ppc) || 0;
+            const container = opt.dataset.container;
+            const packName = container === 'Bottle' ? 'bottles' : 'bags';
+            const bulkUnit = container === 'Bottle' ? 'L' : 'kg';
+            unitHint.innerText = '(' + packName + ')';
+
+            // pack size in litres/kg (ml and gm are thousandths)
+            const sizeBase = (unit === 'ml' || unit === 'gm') ? size / 1000 : size;
+            const bulkQty = parseFloat(document.getElementById('bulk_quantity_used').value) || 0;
+
+            if (bulkQty > 0 && sizeBase > 0) {
+                const packs = Math.floor(bulkQty / sizeBase);
+                const cartons = ppc > 0 ? Math.round((packs / ppc) * 100) / 100 : 0;
+                document.getElementById('finished_qty').value = packs;
+                summary.innerText = bulkQty.toLocaleString() + ' ' + bulkUnit + ' bulk = '
+                    + packs.toLocaleString() + ' ' + packName + ' of ' + opt.text.split(' — ')[0]
+                    + ' ≈ ' + cartons.toLocaleString() + ' carton(s)';
+                summary.style.display = 'block';
+                calcTotals();
+            } else {
+                summary.innerText = 'Enter the bulk quantity above to auto-calculate ' + packName + ' and cartons.';
+                summary.style.display = 'block';
+            }
         }
 
         function validateSubmit() {

@@ -1,8 +1,6 @@
 <?php
-/*
-   ANIMATION SCOPE: PUBLIC PAGE ONLY
-   Post-login pages: NOT MODIFIED ✓
-   PHP/session logic: NOT MODIFIED ✓
+/**
+ * AGROVISE - Public landing page
  */
 
 require_once 'includes/db.php';

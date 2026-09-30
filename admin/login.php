@@ -1,7 +1,6 @@
 <?php
-/*
-   Post-login pages: NOT MODIFIED ✓
-   PHP/session logic: NOT MODIFIED ✓
+/**
+ * AGROVISE - Admin login
  */
 
 require_once '../includes/db.php';

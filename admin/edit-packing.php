@@ -21,16 +21,32 @@ if (!$op) {
 
 $allProducts = $conn->query("SELECT id, name, packing_type FROM products ORDER BY name ASC")->fetchAll();
 
+// The finished lot this operation produced (for its expiry date)
+$finStmt = $conn->prepare("SELECT id, expiry_date FROM purchasing WHERE id = ?");
+$finStmt->execute([$op['finished_purchase_id']]);
+$finishedLot = $finStmt->fetch();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $selling_price = floatval($_POST['selling_price'] ?? 0);
-    
+    $finished_expiry = trim($_POST['finished_expiry'] ?? '');
+    $finished_expiry = $finished_expiry !== '' ? $finished_expiry : null;
+
+    if ($finished_expiry !== null && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $finished_expiry)) {
+        $errors[] = 'Invalid expiry date.';
+    }
+
     // Changing quantities or batches is locked in this simple edit to prevent stock chaos
     // A full edit would require reversing the entire operation and re-executing.
     if (empty($errors)) {
         try {
             $stmt = $conn->prepare("UPDATE packing_operations SET selling_price = ? WHERE id = ?");
             $stmt->execute([$selling_price, $id]);
-            setFlashMessage('success', 'Packing operation metadata updated (Price changed).');
+            // Expiry lives on the finished lot itself (metadata — safe to edit)
+            if ($finishedLot) {
+                $conn->prepare("UPDATE purchasing SET expiry_date = ? WHERE id = ?")
+                     ->execute([$finished_expiry, $finishedLot['id']]);
+            }
+            setFlashMessage('success', 'Packing operation metadata updated (price / expiry).');
             header('Location: packing.php');
             exit;
         } catch (PDOException $e) {
@@ -67,9 +83,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <label class="form-label">Planned Selling Price (Manual) Rs.</label>
                             <input type="number" step="0.01" name="selling_price" class="form-input" value="<?php echo $op['selling_price']; ?>">
                         </div>
-                        
+                        <div class="form-group">
+                            <label class="form-label">Finished Lot Expiry Date</label>
+                            <input type="date" name="finished_expiry" class="form-input" value="<?php echo sanitize($finishedLot['expiry_date'] ?? ''); ?>">
+                            <small style="color:#888;">Shown on Finished Stock and on invoices selling this lot.</small>
+                        </div>
+
                         <div style="margin-top: 20px; display: flex; gap: 10px;">
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Price</button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update</button>
                             <a href="packing.php" class="btn btn-outline">Cancel</a>
                         </div>
                     </form>

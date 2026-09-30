@@ -91,6 +91,13 @@ $flash = getFlashMessage();
                                         <div style="font-size: 0.9em; color: gray;">
                                             Produced: <?php echo number_format($op['finished_qty'], 2); ?> | Batch: <?php echo sanitize($op['finished_batch']); ?>
                                         </div>
+                                        <?php if (!empty($op['pack_label'])): ?>
+                                        <div style="font-size: 0.85em; color: var(--primary-green); margin-top: 3px;">
+                                            <i class="fas fa-box"></i> <?php echo sanitize($op['pack_label']); ?><?php
+                                                echo $op['cartons'] !== null ? ' | ' . rtrim(rtrim(number_format($op['cartons'], 2), '0'), '.') . ' carton(s)' : '';
+                                            ?>
+                                        </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td style="font-weight: bold;">Rs <?php echo number_format($op['bulk_cost'] + $op['total_material_cost'], 2); ?></td>
                                     <td style="color: var(--primary-green);">Rs <?php echo number_format($op['packing_cost'], 2); ?></td>

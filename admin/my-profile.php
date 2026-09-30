@@ -75,6 +75,7 @@ $salesCount = 0; $salesTotal = 0.0; $salaryPaid = 0.0;
 $monthlySales = []; $duePayments = 0.0; $thisMonthSales = 0.0;
 $claimStats = ['WAITING' => 0, 'APPROVED' => 0, 'DECLINED' => 0, 'PAID' => 0, 'paid_total' => 0.0];
 $myVehicles = [];
+$myTarget = null; $yearSales = 0.0; $thisYear = intval(date('Y'));
 
 if ($employee) {
     $row = $conn->prepare("SELECT COUNT(*) c, IFNULL(SUM(total_amount),0) t FROM invoices WHERE employee_id = ?");
@@ -123,6 +124,19 @@ if ($employee) {
     ");
     $mv->execute([$thisMonth, $employee['id']]);
     $myVehicles = $mv->fetchAll();
+
+    // Annual sales target progress (only shown when a target is set for this year)
+    $thisYear = intval(date('Y'));
+    $ts = $conn->prepare("SELECT target_amount FROM sales_targets WHERE employee_id = ? AND target_year = ?");
+    $ts->execute([$employee['id'], $thisYear]);
+    $myTarget = $ts->fetchColumn();
+    $myTarget = $myTarget === false ? null : floatval($myTarget);
+    $yearSales = 0.0;
+    if ($myTarget) {
+        $ys = $conn->prepare("SELECT IFNULL(SUM(total_amount),0) FROM invoices WHERE employee_id = ? AND YEAR(date) = ?");
+        $ys->execute([$employee['id'], $thisYear]);
+        $yearSales = floatval($ys->fetchColumn());
+    }
 }
 
 $flash = getFlashMessage();
@@ -143,7 +157,7 @@ if (($account['role'] ?? '') === 'user') {
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/style.css?v=ed3">
-    <?php if ($employee): ?><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script><?php endif; ?>
+    <?php if ($employee): ?><script src="../assets/js/chart.umd.min.js"></script><?php endif; ?>
 </head>
 <body class="admin-body">
     <div class="admin-wrapper">
@@ -175,6 +189,25 @@ if (($account['role'] ?? '') === 'user') {
                     <div style="font-family:'Cormorant Garamond',serif; font-size:1.7rem; color:<?php echo $duePayments > 1 ? '#b3261e' : '#2e7d32'; ?>;">Rs. <?php echo number_format($duePayments, 0); ?></div>
                 </div>
             </div>
+
+            <?php if ($myTarget): $tgtPct = $yearSales / $myTarget * 100; $tgtDone = $tgtPct >= 100; ?>
+            <!-- Annual sales target progress -->
+            <div class="data-card" style="margin-bottom:20px;">
+                <div class="data-card-header"><h2><i class="fas fa-bullseye"></i> My <?php echo $thisYear; ?> Sales Target</h2></div>
+                <div style="padding:18px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                    <div style="position:relative; flex:1; min-width:200px; height:24px; background:#eef0e9; border:1px solid rgba(15,26,14,0.14); overflow:hidden;">
+                        <div style="height:100%; width:<?php echo min(100, $tgtPct); ?>%; background:<?php echo $tgtDone ? '#2e7d32' : '#c2a04f'; ?>; transition:width 0.6s ease;"></div>
+                    </div>
+                    <span style="font-weight:600; white-space:nowrap; color:<?php echo $tgtDone ? '#2e7d32' : '#23291f'; ?>;">
+                        Rs. <?php echo number_format($yearSales, 0); ?> of Rs. <?php echo number_format($myTarget, 0); ?>
+                        (<?php echo number_format($tgtPct, 1); ?>%)
+                    </span>
+                    <?php if ($tgtDone): ?>
+                    <span class="badge" style="background:#E8F5E9; color:#2E7D32;"><i class="fas fa-trophy"></i> Target achieved!</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <div class="data-card" style="margin-bottom:20px;">
                 <div class="data-card-header"><h2><i class="fas fa-chart-column"></i> My Monthly Sales</h2></div>

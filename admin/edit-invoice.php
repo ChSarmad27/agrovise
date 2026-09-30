@@ -32,7 +32,7 @@ $employeesList = $conn->query("SELECT id, name FROM employees ORDER BY name ASC"
 // Existing items on this invoice
 $itemsStmt = $conn->prepare("
     SELECT ii.purchasing_id, ii.quantity, ii.price, ii.sales_tax, ii.packs_per_carton,
-           pur.type, pur.batch_number, pr.name as product_name
+           pur.type, pur.batch_number, pur.expiry_date, pr.name as product_name
     FROM invoice_items ii
     JOIN purchasing pur ON ii.purchasing_id = pur.id
     JOIN products pr ON ii.product_id = pr.id
@@ -51,7 +51,7 @@ foreach ($existingItems as $it) {
 $stockStmt = $conn->prepare("
     SELECT p.id as purchasing_id, p.product_id, p.batch_number, p.type,
            p.quantity + IFNULL(held.qty, 0) as stock,
-           pr.name as product_name, pr.avg_packs_per_carton, pr.packing_type
+           p.expiry_date, pr.name as product_name, pr.avg_packs_per_carton, pr.packing_type
     FROM purchasing p
     JOIN products pr ON p.product_id = pr.id
     LEFT JOIN (
@@ -274,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <button type="button" class="btn btn-outline btn-sm item-select-btn" onclick="selectItem(${rowIndex})" style="display:none;">Select Item</button>
                 <div class="selected-info" style="display:none;">
                     <strong class="disp-name"></strong><br>
-                    <small>Batch: <span class="disp-batch"></span></small>
+                    <small>Batch: <span class="disp-batch"></span><span class="disp-expiry" style="color:#b26a00;"></span></small>
                 </div>
                 <input type="hidden" name="purchasing_id[]" class="purchasing-id" required>
             </td>
@@ -294,6 +294,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             tr.querySelector('.selected-info').style.display = 'block';
             tr.querySelector('.disp-name').textContent = prefill.product_name;
             tr.querySelector('.disp-batch').textContent = prefill.batch_number;
+            tr.querySelector('.disp-expiry').textContent = prefill.expiry_date ? ' · Exp: ' + prefill.expiry_date : '';
             tr.querySelector('.purchasing-id').value = prefill.purchasing_id;
             tr.querySelector('.pack-input').value = prefill.packs_per_carton;
             tr.querySelector('.stock-label').textContent = stock ? stock.stock : '0';
@@ -338,7 +339,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         let options = {};
         filtered.forEach(i => {
-            options[i.purchasing_id] = `${i.product_name} (Batch: ${i.batch_number}) - Avail: ${i.stock}`;
+            options[i.purchasing_id] = `${i.product_name} (Batch: ${i.batch_number}) - Avail: ${i.stock}`
+                + (i.expiry_date ? ` - Exp: ${i.expiry_date}` : '');
         });
 
         Swal.fire({
@@ -356,6 +358,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 tr.querySelector('.disp-name').textContent = sel.product_name;
                 tr.querySelector('.disp-batch').textContent = sel.batch_number;
+                tr.querySelector('.disp-expiry').textContent = sel.expiry_date ? ' · Exp: ' + sel.expiry_date : '';
                 tr.querySelector('.purchasing-id').value = sel.purchasing_id;
                 tr.querySelector('.pack-input').value = sel.avg_packs_per_carton;
                 tr.querySelector('.stock-label').textContent = sel.stock;

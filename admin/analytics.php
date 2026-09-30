@@ -45,17 +45,23 @@ $topLossStmt = $conn->query("
 ");
 $topLosing = $topLossStmt->fetchAll();
 
-// 4. MONTHLY TRENDS (Last 6 Months)
+// 4. MONTHLY TRENDS (last 6 months present in the data)
+// Grouped sub-selects keep this valid under MySQL 8's ONLY_FULL_GROUP_BY
+// (the old GROUP BY month ORDER BY i.date form threw error 1055 and killed the page).
 $trendsStmt = $conn->query("
-    SELECT DATE_FORMAT(date, '%b %Y') as month,
-           SUM(total_amount) as sales,
-           (SELECT SUM(total_price) FROM purchasing WHERE DATE_FORMAT(date_added, '%b %Y') = DATE_FORMAT(i.date, '%b %Y')) as purchases
-    FROM invoices i
-    GROUP BY month
-    ORDER BY i.date ASC
+    SELECT s.month, s.sales, IFNULL(pu.purchases, 0) AS purchases
+    FROM (
+        SELECT DATE_FORMAT(date, '%Y-%m') AS ym, DATE_FORMAT(date, '%b %Y') AS month, SUM(total_amount) AS sales
+        FROM invoices GROUP BY ym, month
+    ) s
+    LEFT JOIN (
+        SELECT DATE_FORMAT(date_added, '%Y-%m') AS ym, SUM(total_price) AS purchases
+        FROM purchasing GROUP BY ym
+    ) pu ON pu.ym = s.ym
+    ORDER BY s.ym DESC
     LIMIT 6
 ");
-$monthlyTrends = $trendsStmt->fetchAll();
+$monthlyTrends = array_reverse($trendsStmt->fetchAll());
 
 // 5. VENDOR OUTSTANDING
 $vendorHealthStmt = $conn->query("
@@ -75,7 +81,7 @@ $vendorHealth = $vendorHealthStmt->fetchAll();
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/style.css?v=ed3">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="../assets/js/chart.umd.min.js"></script>
     <style>
         .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 20px; }
         .chart-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }

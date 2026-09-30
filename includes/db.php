@@ -3,15 +3,19 @@
  * AGROVISE Database Configuration
  * MySQL connection setup for the agriculture products website.
  *
- * Fresh install: import agrovise_db.sql (repo root) — it is the schema
- * source of truth and includes the default admin account (admin/admin123).
+ * Fresh install: import database/schema.sql — it creates every table plus
+ * the default admin account (admin/admin123; change it after first login).
  */
 
-// Database credentials
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'agrovise_db');
+// Server-specific credentials go in includes/config.php (never committed;
+// copy config.example.php). Without it, the local WAMP defaults below apply.
+if (file_exists(__DIR__ . '/config.php')) {
+    require __DIR__ . '/config.php';
+}
+defined('DB_HOST') || define('DB_HOST', 'localhost');
+defined('DB_USER') || define('DB_USER', 'root');
+defined('DB_PASS') || define('DB_PASS', '');
+defined('DB_NAME') || define('DB_NAME', 'agrovise_db');
 
 /**
  * Create database connection

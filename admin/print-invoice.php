@@ -21,7 +21,7 @@ if (!$invoice) {
     die("Invoice not found.");
 }
 
-$itemsStmt = $conn->prepare("SELECT ii.*, p.name as product_name, purch.batch_number
+$itemsStmt = $conn->prepare("SELECT ii.*, p.name as product_name, purch.batch_number, purch.expiry_date
                              FROM invoice_items ii
                              JOIN products p ON ii.product_id = p.id
                              JOIN purchasing purch ON ii.purchasing_id = purch.id
@@ -100,6 +100,7 @@ $grandTotal = $subTotal + $taxTotal;
                     <th>S.No</th>
                     <th>Product Details</th>
                     <th>Batch Number</th>
+                    <th>Expiry</th>
                     <th>Packs/Carton</th>
                     <th>Quantity Delivered</th>
                     <?php if ($hasTax): ?>
@@ -115,6 +116,7 @@ $grandTotal = $subTotal + $taxTotal;
                     <td><?php echo $idx++; ?></td>
                     <td><strong><?php echo sanitize($item['product_name']); ?></strong></td>
                     <td><?php echo sanitize($item['batch_number']); ?></td>
+                    <td><?php echo $item['expiry_date'] ? date('M d, Y', strtotime($item['expiry_date'])) : '—'; ?></td>
                     <td><?php echo sanitize($item['packs_per_carton']); ?></td>
                     <td><strong><?php echo number_format($item['quantity'], 2); ?></strong></td>
                     <?php if ($hasTax): ?>

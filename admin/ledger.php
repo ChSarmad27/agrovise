@@ -78,7 +78,6 @@ $flash = getFlashMessage();
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/style.css?v=ed3">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .report-section { margin-bottom: 40px; }
         .tab-btn { padding: 10px 20px; cursor: pointer; border: none; background: #f1f1f1; font-weight: 600; border-radius: 8px 8px 0 0; margin-right: 5px; transition: 0.3s; }

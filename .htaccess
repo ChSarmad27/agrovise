@@ -3,6 +3,9 @@
 # No directory listings anywhere
 Options -Indexes
 
+# The PHP homepage wins over any stray index.html
+DirectoryIndex index.php index.html
+
 # Block direct download of sensitive files (DB dumps, docs, backups, VCS, config)
 <FilesMatch "\.(sql|md|zip|log|sh|py|ini|bak|old|dist|json|lock)$">
     Require all denied

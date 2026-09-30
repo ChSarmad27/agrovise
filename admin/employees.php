@@ -105,6 +105,7 @@ $flash = getFlashMessage();
                                 </td>
                                 <td>
                                     <div class="action-btns">
+                                        <a href="sales-targets.php?id=<?php echo $emp['id']; ?>" class="btn-icon" title="View details, sales &amp; target progress"><i class="fas fa-eye"></i></a>
                                         <a href="edit-employee.php?id=<?php echo $emp['id']; ?>" class="btn-icon edit" title="Edit"><i class="fas fa-edit"></i></a>
                                         <a href="?delete=<?php echo $emp['id']; ?>" class="btn-icon delete" onclick="return confirm('Delete employee records?');"><i class="fas fa-trash"></i></a>
                                     </div>

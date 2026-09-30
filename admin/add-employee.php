@@ -29,6 +29,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         (array)($_POST['perms'] ?? [])
     ));
 
+    // Annual sales target (optional — typically for sales staff)
+    $target_year   = intval($_POST['target_year'] ?? date('Y'));
+    $target_amount = floatval($_POST['target_amount'] ?? 0);
+
     // Auto-insert dashes when the digit count is right (03001234567 -> 0300-1234567)
     $phone = normalizePhonePK($phone) ?? $phone;
     $cnic  = normalizeCNIC($cnic) ?? $cnic;
@@ -38,6 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if(!preg_match('/^[0-9]{5}-[0-9]{7}-[0-9]$/', $cnic)) $errors[] = "CNIC must contain 13 digits (XXXXX-XXXXXXX-X).";
     if(!preg_match('/^\d{4}-\d{7}$/', $phone)) $errors[] = "Phone must contain 11 digits (0300-1234567).";
     if($salary < 0) $errors[] = "Salary cannot be negative.";
+    if($target_amount < 0) $errors[] = "Sales target cannot be negative.";
+    if($target_amount > 0 && ($target_year < intval(date('Y')) - 1 || $target_year > intval(date('Y')) + 1)) $errors[] = "Invalid target year.";
 
     if ($create_account) {
         if (!filter_var($acc_email, FILTER_VALIDATE_EMAIL)) $errors[] = "A valid account email is required.";
@@ -59,6 +65,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $conn->prepare("INSERT INTO employees (name, cnic, phone, address, role, salary) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->execute([$name, $cnic, $phone, $address, $role, $salary]);
             $employee_id = $conn->lastInsertId();
+
+            if ($target_amount > 0) {
+                $conn->prepare("INSERT INTO sales_targets (employee_id, target_year, target_amount) VALUES (?, ?, ?)
+                                ON DUPLICATE KEY UPDATE target_amount = VALUES(target_amount)")
+                     ->execute([$employee_id, $target_year, $target_amount]);
+            }
 
             if ($create_account) {
                 // Sales Employee = a user with no modules (My Space + Expenses only)
@@ -150,6 +162,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="form-group">
                             <label class="form-label">Salary (Rs)</label>
                             <input type="number" name="salary" class="form-input" step="0.01" required value="<?php echo sanitize($_POST['salary'] ?? ''); ?>">
+                        </div>
+
+                        <!-- ================= ANNUAL SALES TARGET ================= -->
+                        <div style="border-top: 1px solid #e0e0e0; margin: 26px 0 20px; padding-top: 20px;">
+                            <p style="font-weight:600; display:flex; align-items:center; gap:10px; margin:0;">
+                                <i class="fas fa-bullseye" style="color: var(--primary-green);"></i> Annual Sales Target (optional)
+                            </p>
+                            <p style="font-size:0.8rem; color:#777; margin:6px 0 14px 28px;">Typically set for sales staff, but can be given to any employee. Progress shows on the Sales Targets page, the employee list, and the employee's own profile. Leave blank for no target.</p>
+                            <div style="display:grid; grid-template-columns: 1fr 2fr; gap: 20px;">
+                                <div class="form-group">
+                                    <label class="form-label">Target Year</label>
+                                    <select name="target_year" class="form-select">
+                                        <?php $yNow = intval(date('Y')); foreach ([$yNow - 1, $yNow, $yNow + 1] as $ty): ?>
+                                        <option value="<?php echo $ty; ?>" <?php echo intval($_POST['target_year'] ?? $yNow) === $ty ? 'selected' : ''; ?>><?php echo $ty; ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Target Amount (Rs)</label>
+                                    <input type="number" name="target_amount" class="form-input" step="0.01" min="0" placeholder="e.g. 5000000" value="<?php echo sanitize($_POST['target_amount'] ?? ''); ?>">
+                                </div>
+                            </div>
                         </div>
 
                         <!-- ================= SYSTEM ACCESS ================= -->

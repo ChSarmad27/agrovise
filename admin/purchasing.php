@@ -10,11 +10,15 @@ requirePermission('purchasing');
 
 $conn = getDBConnection();
 
-// Fetch purchases
+// Fetch purchases — only stock actually bought in. FINISHED lots that were
+// produced by our own packing operations live on finished-products.php;
+// a FINISHED lot bought ready-made from a vendor still shows here.
 $stmt = $conn->query("
     SELECT p.*, pr.name as product_name
     FROM purchasing p
     JOIN products pr ON p.product_id = pr.id
+    LEFT JOIN packing_operations po ON po.finished_purchase_id = p.id
+    WHERE p.type <> 'FINISHED' OR po.id IS NULL
     ORDER BY p.date_added DESC
 ");
 $purchases = $stmt->fetchAll();
@@ -60,8 +64,10 @@ $flash = getFlashMessage();
             </div>
             <?php endif; ?>
             
-            <div class="action-bar" style="margin-bottom: 20px;">
+            <div class="action-bar" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <a href="add-purchase.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add Purchase</a>
+                <a href="finished-products.php" class="btn btn-outline"><i class="fas fa-box"></i> Finished Stock (our packing)</a>
+                <span style="font-size: 0.8rem; color: #888;"><i class="fas fa-info-circle"></i> Products packed in-house are listed under Finished Stock, not here.</span>
             </div>
             
             <div class="data-card">
@@ -99,6 +105,7 @@ $flash = getFlashMessage();
                                     <td><?php echo date('M d, Y', strtotime($p['date_added'])); ?></td>
                                     <td class="action-btns">
                                         <div style="display: flex; gap: 5px;">
+                                            <a href="print-purchase.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="Print Purchase Bill" target="_blank"><i class="fas fa-print"></i></a>
                                             <a href="edit-purchase.php?id=<?php echo $p['id']; ?>" class="btn-icon edit" title="Edit"><i class="fas fa-edit"></i></a>
                                             <a href="?delete=<?php echo $p['id']; ?>" class="btn-icon delete" title="Delete" onclick="return confirm('Are you sure you want to delete this purchase record? Note: Deletion may fail if this item is used in packing or invoices.');"><i class="fas fa-trash"></i></a>
                                         </div>

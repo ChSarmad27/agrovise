@@ -28,6 +28,14 @@ $account = $accStmt->fetch();
 
 $adminCount = intval($conn->query("SELECT COUNT(*) FROM admins WHERE role = 'admin'")->fetchColumn());
 
+// Annual sales targets for this employee (last year / this year / next year are editable)
+$yNow = intval(date('Y'));
+$targetYears = [$yNow - 1, $yNow, $yNow + 1];
+$targets = [];
+$tst = $conn->prepare("SELECT target_year, target_amount FROM sales_targets WHERE employee_id = ?");
+$tst->execute([$id]);
+foreach ($tst->fetchAll() as $t) $targets[intval($t['target_year'])] = floatval($t['target_amount']);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $role = trim($_POST['role'] ?? '');
@@ -91,6 +99,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $conn->prepare("UPDATE employees SET name = ?, role = ?, phone = ?, cnic = ?, salary = ? WHERE id = ?");
             $stmt->execute([$name, $role, $phone, $cnic, $salary, $id]);
+
+            // Annual sales targets: a positive amount is saved, a blank/zero field removes the year's target
+            $postedTargets = (array)($_POST['targets'] ?? []);
+            $upsertT = $conn->prepare("INSERT INTO sales_targets (employee_id, target_year, target_amount) VALUES (?, ?, ?)
+                                       ON DUPLICATE KEY UPDATE target_amount = VALUES(target_amount)");
+            $deleteT = $conn->prepare("DELETE FROM sales_targets WHERE employee_id = ? AND target_year = ?");
+            foreach ($targetYears as $ty) {
+                if (!array_key_exists($ty, $postedTargets)) continue;
+                $amt = floatval($postedTargets[$ty]);
+                if ($amt > 0) {
+                    $upsertT->execute([$id, $ty, $amt]);
+                } else {
+                    $deleteT->execute([$id, $ty]);
+                }
+            }
 
             $accMsg = '';
             if ($account && $remove_account) {
@@ -187,6 +210,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="form-group">
                             <label class="form-label">Salary (Monthly) Rs. *</label>
                             <input type="number" step="0.01" name="salary" class="form-input" required value="<?php echo $employee['salary']; ?>">
+                        </div>
+
+                        <!-- ================= ANNUAL SALES TARGET ================= -->
+                        <div style="border-top: 1px solid #e0e0e0; margin: 26px 0 20px; padding-top: 20px;">
+                            <p style="font-weight:600; display:flex; align-items:center; gap:10px; margin:0;">
+                                <i class="fas fa-bullseye" style="color: var(--primary-green);"></i> Annual Sales Targets
+                            </p>
+                            <p style="font-size:0.8rem; color:#777; margin:6px 0 14px 28px;">Typically set for sales staff, but can be given to any employee. Clear a field to remove that year's target.</p>
+                            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px;">
+                                <?php foreach ($targetYears as $ty): ?>
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label"><?php echo $ty; ?><?php echo $ty === $yNow ? ' (current)' : ''; ?></label>
+                                    <input type="number" name="targets[<?php echo $ty; ?>]" class="form-input" step="0.01" min="0"
+                                           placeholder="No target" value="<?php echo isset($targets[$ty]) ? $targets[$ty] : ''; ?>">
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
 
                         <!-- ================= SYSTEM ACCESS ================= -->

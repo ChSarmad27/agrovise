@@ -20,10 +20,10 @@ $__notifCount = unreadNotificationCount(getDBConnection());
 // pages per group (for auto-open state)
 $__gMySpace = ['my-profile.php', 'expenses.php'];
 $__gCatalog = ['add-product.php', 'edit-product.php', 'publish-products.php'];
-$__gSupply  = ['purchasing.php', 'add-purchase.php', 'edit-purchase.php', 'vendors.php', 'add-vendor.php', 'edit-vendor.php', 'packing.php', 'add-packing.php', 'edit-packing.php'];
+$__gSupply  = ['purchasing.php', 'add-purchase.php', 'edit-purchase.php', 'finished-products.php', 'vendors.php', 'add-vendor.php', 'edit-vendor.php', 'packing.php', 'add-packing.php', 'edit-packing.php', 'pack-sizes.php'];
 $__gSales   = ['invoices.php', 'add-invoice.php', 'edit-invoice.php', 'pr.php', 'add-pr.php', 'edit-pr.php', 'clients.php', 'add-client.php', 'edit-client.php', 'policies.php', 'add-policy.php', 'edit-policy.php', 'policy-calculator.php'];
 $__gFinance = ['banking.php', 'add-account.php', 'edit-account.php', 'add-transaction.php', 'edit-transaction.php', 'ledger.php', 'ledger-client.php', 'ledger-product.php', 'detailed-report.php', 'analytics.php'];
-$__gCompany = ['employees.php', 'add-employee.php', 'edit-employee.php', 'designations.php', 'vehicles.php', 'add-vehicle.php', 'edit-vehicle.php', 'messaging.php'];
+$__gCompany = ['employees.php', 'add-employee.php', 'edit-employee.php', 'designations.php', 'sales-targets.php', 'vehicles.php', 'add-vehicle.php', 'edit-vehicle.php', 'messaging.php'];
 ?>
         <aside class="admin-sidebar">
             <div class="sidebar-header">
@@ -58,8 +58,10 @@ $__gCompany = ['employees.php', 'add-employee.php', 'edit-employee.php', 'design
                     <button type="button" class="menu-group-btn"><i class="fas fa-boxes-stacked"></i> Supply <i class="fas fa-chevron-down caret"></i></button>
                     <ul class="menu-sub">
                         <?php if (hasPermission('purchasing')): ?><li><a href="purchasing.php" <?php echo $__active(['purchasing.php', 'add-purchase.php', 'edit-purchase.php']); ?>><i class="fas fa-shopping-cart"></i> Purchasing</a></li><?php endif; ?>
+                        <?php if (hasPermission('purchasing') || hasPermission('packing')): ?><li><a href="finished-products.php" <?php echo $__active(['finished-products.php']); ?>><i class="fas fa-box"></i> Finished Stock</a></li><?php endif; ?>
                         <?php if (hasPermission('vendors')): ?><li><a href="vendors.php" <?php echo $__active(['vendors.php', 'add-vendor.php', 'edit-vendor.php']); ?>><i class="fas fa-truck"></i> Vendors</a></li><?php endif; ?>
                         <?php if (hasPermission('packing')): ?><li><a href="packing.php" <?php echo $__active(['packing.php', 'add-packing.php', 'edit-packing.php']); ?>><i class="fas fa-box-open"></i> Packing</a></li><?php endif; ?>
+                        <?php if (hasPermission('packing')): ?><li><a href="pack-sizes.php" <?php echo $__active(['pack-sizes.php']); ?>><i class="fas fa-boxes-packing"></i> Pack Sizes</a></li><?php endif; ?>
                     </ul>
                 </li>
                 <?php endif; ?>
@@ -93,6 +95,7 @@ $__gCompany = ['employees.php', 'add-employee.php', 'edit-employee.php', 'design
                     <ul class="menu-sub">
                         <?php if (hasPermission('employees')): ?><li><a href="employees.php" <?php echo $__active(['employees.php', 'add-employee.php', 'edit-employee.php']); ?>><i class="fas fa-id-badge"></i> Employees</a></li><?php endif; ?>
                         <?php if (hasPermission('employees')): ?><li><a href="designations.php" <?php echo $__active(['designations.php']); ?>><i class="fas fa-user-tag"></i> Designations</a></li><?php endif; ?>
+                        <?php if (hasPermission('employees')): ?><li><a href="sales-targets.php" <?php echo $__active(['sales-targets.php']); ?>><i class="fas fa-bullseye"></i> Sales Targets</a></li><?php endif; ?>
                         <?php if (hasPermission('vehicles')): ?><li><a href="vehicles.php" <?php echo $__active(['vehicles.php', 'add-vehicle.php', 'edit-vehicle.php']); ?>><i class="fas fa-car"></i> Vehicles</a></li><?php endif; ?>
                         <?php if (hasPermission('employees')): ?><li><a href="messaging.php" <?php echo $__active(['messaging.php']); ?>><i class="fas fa-comment-sms"></i> Messaging</a></li><?php endif; ?>
                     </ul>
