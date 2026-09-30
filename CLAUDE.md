@@ -17,6 +17,7 @@ Both wear the "Harvest Editorial" design (forest-ink/ivory/wheat-gold, Cormorant
 - DB connection constants live in `includes/db.php` (MySQL `agrovise_db` on localhost, user `root`, empty password).
 - **Fresh install: import `agrovise_db.sql`** (mysqldump at the repo root — the schema source of truth, includes the default admin). There is no installer script.
 - There is no lint/test/build tooling. Verify changes by loading the affected page in the browser. PHP CLI for syntax checks: `f:/wamp64/bin/php/php8.3.28/php.exe -l <file>`.
+- **GitHub Pages static snapshot:** `docs/` is a generated, static copy of the public site only (home + 5 category pages, `.php` links rewritten to `.html`, admin links and the `track.php` beacon stripped, only the product images the pages show). Rebuild it with `f:/wamp64/bin/php/php8.3.28/php.exe tools/build-pages.php` (MySQL must be running) after publishing/unpublishing products or changing public pages, then commit `docs/`. Never hand-edit `docs/`; the script wipes and regenerates it. The admin ERP cannot run on Pages.
 - `LOGIC_CHANGES.md` logs every logic fix/feature with before/after code; `_removed_backup_2026-07-04.zip` holds files deleted in the 2026-07 cleanup.
 
 ## Page architecture
